@@ -10,4 +10,4 @@ log = "0.4"
 
 [[bin]]
 name = "rusty-file-system"
-path = "main.rs"
+path = "src/main.rs"
