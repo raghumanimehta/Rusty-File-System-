@@ -1,0 +1,13 @@
+[package]
+name = "rusty-file-system"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+fuser = "0.14"
+env_logger = "0.11"
+log = "0.4"
+
+[[bin]]
+name = "rusty-file-system"
+path = "main.rs"
