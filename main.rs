@@ -1,12 +1,14 @@
 use fuser::{Filesystem, MountOption};
 use std::env;
 use std::fs::FileType;
+use bitvec::prelude::*;
 
 struct NullFS;
 
 impl Filesystem for NullFS {}
 
 const BLOCK_SIZE: u64 = 4096;
+const BITMAP_SIZE_BYTES: usize = 4096; 
 const NUM_DIRECT_PTR: usize = 12;
 
 pub struct Inode {
@@ -22,7 +24,19 @@ pub struct Inode {
     pub tri_indirect_blk: u32, 
 }
 
+pub struct InodeBitmap {
+    pub map: BitArray<[u8; BITMAP_SIZE_BYTES], Lsb0>
+}
 
+impl InodeBitmap {
+
+    fn new() -> Self {
+        Self {
+            map::BitArray::ZERO
+        } 
+    }
+
+}
 
 fn main() {
     env_logger::init();
