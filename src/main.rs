@@ -1,8 +1,7 @@
-use fuser::{Filesystem, MountOption, FileType};
-use log::{debug, error, log_enabled, info, Level};
-use std::env;
 use bitvec::prelude::*;
-
+use fuser::{FileType, Filesystem, MountOption};
+use log::{debug, error, info, log_enabled, Level};
+use std::env;
 
 struct NullFS;
 impl Filesystem for NullFS {}
@@ -35,8 +34,8 @@ impl Default for SuperBlock {
         Self {
             ino_count: MAX_NUM_INODES,
             blk_count: NUM_DATA_BLKS,
-            free_blk_count: NUM_DATA_BLKS - 3u32, // first three blocks are reserved for FS metadata 
-            free_ino_count: MAX_NUM_INODES - 1, // first inode is reserved for the root
+            free_blk_count: NUM_DATA_BLKS - 3u32, // first three blocks are reserved for FS metadata
+            free_ino_count: MAX_NUM_INODES - 1,   // first inode is reserved for the root
             super_blk_no: 0,
             mtime: 0,
             wtime: 0,
@@ -58,24 +57,22 @@ struct FreeBlockBitmap {
 }
 
 impl FreeObjectBitmap<FREE_BLK_BMAP_SIZE_BYTES> for FreeBlockBitmap {
-
     fn map(&self) -> &BitArray<[u8; FREE_BLK_BMAP_SIZE_BYTES], Lsb0> {
         &self.map
     }
 }
 
-
 struct Inode {
-    ino_id: u64,            // inode number
-    size: u64,              // file size 
-    blocks: u64,            // num blocks allocated 
-    mtime_secs: i64,        // Easier to save to disk than SystemTime. Ignored the atime and ctime for now. 
-    kind: FileType,  
-    perm: u16, 
-    direct_blks: [u32; NUM_INO_DIRECT_PTR], 
+    ino_id: u64,     // inode number
+    size: u64,       // file size
+    blocks: u64,     // num blocks allocated
+    mtime_secs: i64, // Easier to save to disk than SystemTime. Ignored the atime and ctime for now.
+    kind: FileType,
+    perm: u16,
+    direct_blks: [u32; NUM_INO_DIRECT_PTR],
     indirect_blk: u32,
     dbl_indirect_blk: u32,
-    tri_indirect_blk: u32, 
+    tri_indirect_blk: u32,
 }
 
 #[derive(Default)]
@@ -84,7 +81,6 @@ struct FreeInodeBitmap {
 }
 
 impl FreeObjectBitmap<FREE_INODE_BMAP_SIZE_BYTES> for FreeInodeBitmap {
-
     fn map(&self) -> &BitArray<[u8; FREE_INODE_BMAP_SIZE_BYTES], Lsb0> {
         &self.map
     }
@@ -96,11 +92,10 @@ struct FSState {
     free_blks: FreeBlockBitmap,
     inode_bitmap: FreeInodeBitmap,
     inodes: Vec<Inode>,
-    blks: Vec<u8>, 
+    blks: Vec<u8>,
 }
 
 impl FSState {
-
     fn alloc_inode(&mut self) -> Option<u64> {
         None
     }
