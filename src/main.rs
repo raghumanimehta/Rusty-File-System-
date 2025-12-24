@@ -1,14 +1,19 @@
-use fuser::{Filesystem, MountOption};
+use fuser::{Filesystem, MountOption, FileType};
 use std::env;
-use std::fs::FileType;
 use bitvec::prelude::*;
 
 
 struct NullFS;
-
 impl Filesystem for NullFS {}
 
-const NUM_DATA_BLKS: usize = 250_000; // 1GB FS, can be whatever, can even be made dynamic later
+const BLK_SIZE: usize = 4096;
+const FS_SIZE: usize = 512usize * (1usize << 30); 
+const NUM_DATA_BLKS: usize = FS_SIZE / BLK_SIZE ;
+
+const DATA_BLK_BITMAP_BYTES: usize = (NUM_DATA_BLKS + 7) / 8;
+
+const BITMAP_SIZE_BYTES: usize = 4096;
+const NUM_DIRECT_PTR: usize = 12;
 
 // 28 bytes starting at offset 0
 // free inode bitmap can begin at offset 28 and inode table can follow immediately after
@@ -22,58 +27,57 @@ struct SuperBlock {
     wtime: u32,
 }
 
-trait FreeObjectBitMap {
-    fn new() -> Self {
-        Self {
-            bitmap: BitArray::ZERO
-        }
-    }
+trait FreeObjectBitmap<const N: usize> {
+    fn map(&self) -> &BitArray<[u8; N], Lsb0>;
 
     fn find_first_free(&self) -> Option<usize> {
-        self.map.first_zero()
+        self.map().first_zero()
     }
 }
 
-struct FreeBlockBitMap {
-    bitmap: BitArray<[u8; NUM_DATA_BLKS], Lsb0>,
+struct FreeBlockBitmap {
+    map: BitArray<[u8; DATA_BLK_BITMAP_BYTES], Lsb0>,
 }
 
-impl FreeObjectBitMap for FreeBlockBitMap {}
-
-
-// const BLOCK_SIZE: u64 = 4096;  Don't remember why I declared this; maybe because of reference 
-const BITMAP_SIZE_BYTES: usize = 4096; 
-const NUM_DIRECT_PTR: usize = 12;
-
-pub struct Inode {
-    pub ino_id: u64,            // inode number
-    pub size: u64,              // file size 
-    pub blocks: u64,            // num blocks allocated 
-    pub mtime_secs: i64,        // Easier to save to disk than SystemTime. Ignored the atime and ctime for now. 
-    pub kind: FileType,  
-    pub perm: u16, 
-    pub direct_blks: [u32; NUM_DIRECT_PTR], 
-    pub indirect_blk: u32,
-    pub dbl_indirect_blk: u32,
-    pub tri_indirect_blk: u32, 
+impl FreeBlockBitmap {
+    fn new() -> Self {
+        Self { map: BitArray::ZERO }
+    }
 }
 
-pub struct InodeBitmap {
-    pub map: BitArray<[u8; BITMAP_SIZE_BYTES], Lsb0>
+impl FreeObjectBitmap<DATA_BLK_BITMAP_BYTES> for FreeBlockBitmap {
+    fn map(&self) -> &BitArray<[u8; DATA_BLK_BITMAP_BYTES], Lsb0> {
+        &self.map
+    }
+}
+
+struct Inode {
+    ino_id: u64,            // inode number
+    size: u64,              // file size 
+    blocks: u64,            // num blocks allocated 
+    mtime_secs: i64,        // Easier to save to disk than SystemTime. Ignored the atime and ctime for now. 
+    kind: FileType,  
+    perm: u16, 
+    direct_blks: [u32; NUM_DIRECT_PTR], 
+    indirect_blk: u32,
+    dbl_indirect_blk: u32,
+    tri_indirect_blk: u32, 
+}
+
+struct InodeBitmap {
+    map: BitArray<[u8; BITMAP_SIZE_BYTES], Lsb0>,
 }
 
 impl InodeBitmap {
-
-    pub fn new() -> Self {
-        Self {
-            map: BitArray::ZERO
-        } 
+    fn new() -> Self {
+        Self { map: BitArray::ZERO }
     }
+}
 
-    pub fn find_first_free(&self) -> Option<usize> {
-        self.map.first_zero()
+impl FreeObjectBitmap<BITMAP_SIZE_BYTES> for InodeBitmap {
+    fn map(&self) -> &BitArray<[u8; BITMAP_SIZE_BYTES], Lsb0> {
+        &self.map
     }
-
 }
 
 fn main() {
