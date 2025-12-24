@@ -7,7 +7,7 @@ struct NullFS;
 
 impl Filesystem for NullFS {}
 
-const BLOCK_SIZE: u64 = 4096;
+// const BLOCK_SIZE: u64 = 4096;  Don't remember why I declared this; maybe because of reference 
 const BITMAP_SIZE_BYTES: usize = 4096; 
 const NUM_DIRECT_PTR: usize = 12;
 
@@ -30,10 +30,14 @@ pub struct InodeBitmap {
 
 impl InodeBitmap {
 
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
-            map::BitArray::ZERO
+            map: BitArray::ZERO
         } 
+    }
+
+    pub fn find_first_free(&self) -> Option<usize> {
+        self.map.first_zero()
     }
 
 }
