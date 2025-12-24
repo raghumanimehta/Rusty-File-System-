@@ -1,4 +1,5 @@
 use fuser::{Filesystem, MountOption, FileType};
+use log::{debug, error, log_enabled, info, Level};
 use std::env;
 use bitvec::prelude::*;
 
@@ -11,12 +12,12 @@ impl Filesystem for NullFS {}
 const FS_SIZE_BYTES: u64 = 1u64 * (0b1 << 30) as u64; // 1 GB, toy size
 const BLK_SIZE_BYTES: u64 = 4096u64;
 const NUM_DATA_BLKS: u32 = (FS_SIZE_BYTES / BLK_SIZE_BYTES) as u32;
-const FREE_BLK_BMAP_SIZE_BYTES: usize = (NUM_DATA_BLKS + 7) / 8 as usize;
+const FREE_BLK_BMAP_SIZE_BYTES: usize = ((NUM_DATA_BLKS + 7) / 8) as usize;
 
 // Inodes
 const MAX_NUM_INODES: u32 = 10; // toy size
-const FREE_INODE_BMAP_SIZE_BYTES: usize = (MAX_NUM_INODES + 7) / 8 as usize;
-const NUM_INO_DIRECT_PTR: u8 = 12;
+const FREE_INODE_BMAP_SIZE_BYTES: usize = ((MAX_NUM_INODES + 7) / 8) as usize;
+const NUM_INO_DIRECT_PTR: usize = 12;
 
 // free inode bitmap can begin right after this struct and inode table can follow immediately after
 struct SuperBlock {
@@ -43,10 +44,8 @@ impl Default for SuperBlock {
     }
 }
 
-trait FreeObjectBitmap {
-    const N: usize;
-
-    fn map(&self) -> &BitArray<[u8; Self::N], Lsb0>;
+trait FreeObjectBitmap<const N: usize> {
+    fn map(&self) -> &BitArray<[u8; N], Lsb0>;
 
     fn find_first_free(&self) -> Option<usize> {
         self.map().first_zero()
@@ -58,10 +57,9 @@ struct FreeBlockBitmap {
     map: BitArray<[u8; FREE_BLK_BMAP_SIZE_BYTES], Lsb0>,
 }
 
-impl FreeObjectBitmap for FreeBlockBitmap {
-    const N: usize = FREE_BLK_BMAP_SIZE_BYTES;
+impl FreeObjectBitmap<FREE_BLK_BMAP_SIZE_BYTES> for FreeBlockBitmap {
 
-    fn map(&self) -> &BitArray<[u8; Self::N], Lsb0> {
+    fn map(&self) -> &BitArray<[u8; FREE_BLK_BMAP_SIZE_BYTES], Lsb0> {
         &self.map
     }
 }
@@ -85,10 +83,9 @@ struct FreeInodeBitmap {
     map: BitArray<[u8; FREE_INODE_BMAP_SIZE_BYTES], Lsb0>,
 }
 
-impl FreeObjectBitmap for FreeInodeBitmap {
-    const N: usize = FREE_INODE_BMAP_SIZE_BYTES;
+impl FreeObjectBitmap<FREE_INODE_BMAP_SIZE_BYTES> for FreeInodeBitmap {
 
-    fn map(&self) -> &BitArray<[u8; Self::N], Lsb0> {
+    fn map(&self) -> &BitArray<[u8; FREE_INODE_BMAP_SIZE_BYTES], Lsb0> {
         &self.map
     }
 }
