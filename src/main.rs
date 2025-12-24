@@ -8,10 +8,10 @@ impl Filesystem for NullFS {}
 
 const BLK_SIZE: usize = 4096;
 const FS_SIZE: usize = 512usize * (1usize << 30); 
-const NUM_DATA_BLKS: usize = FS_SIZE / BLK_SIZE ;
+const NUM_DATA_BLKS: usize = FS_SIZE / BLK_SIZE;
 
 const DATA_BLK_BITMAP_BYTES: usize = (NUM_DATA_BLKS + 7) / 8;
-
+const NUM_INODES: usize = 
 const BITMAP_SIZE_BYTES: usize = 4096;
 const NUM_DIRECT_PTR: usize = 12;
 
@@ -27,6 +27,20 @@ struct SuperBlock {
     wtime: u32,
 }
 
+impl Default for SuperBlock {
+    fn default() -> Self {
+        Self {
+            ino_count: 0,
+            blk_count: NUM_DATA_BLKS as u32,
+            free_blk_count: NUM_DATA_BLKS as u32,
+            free_ino_count: 0,
+            super_blk_no: 0,
+            mtime: 0,
+            wtime: 0,
+        }
+    }
+}
+
 trait FreeObjectBitmap<const N: usize> {
     fn map(&self) -> &BitArray<[u8; N], Lsb0>;
 
@@ -37,6 +51,12 @@ trait FreeObjectBitmap<const N: usize> {
 
 struct FreeBlockBitmap {
     map: BitArray<[u8; DATA_BLK_BITMAP_BYTES], Lsb0>,
+}
+
+impl Default for FreeBlockBitmap {
+    fn default() -> Self {
+        Self { map: BitArray::ZERO }
+    }
 }
 
 impl FreeBlockBitmap {
@@ -68,6 +88,12 @@ struct InodeBitmap {
     map: BitArray<[u8; BITMAP_SIZE_BYTES], Lsb0>,
 }
 
+impl Default for InodeBitmap {
+    fn default() -> Self {
+        Self { map: BitArray::ZERO }
+    }
+}
+
 impl InodeBitmap {
     fn new() -> Self {
         Self { map: BitArray::ZERO }
@@ -77,6 +103,37 @@ impl InodeBitmap {
 impl FreeObjectBitmap<BITMAP_SIZE_BYTES> for InodeBitmap {
     fn map(&self) -> &BitArray<[u8; BITMAP_SIZE_BYTES], Lsb0> {
         &self.map
+    }
+}
+
+struct FSState {
+    superblock: SuperBlock,
+    free_blocks: FreeBlockBitmap,
+    inode_bitmap: InodeBitmap,
+    inodes: Vec<Inode>,
+    blks: Vec<u8>, 
+}
+
+impl Default for FSState {
+    fn default() -> Self {
+        Self {
+            // TODO: Fix 
+            superblock: SuperBlock::default(),
+            free_blocks: FreeBlockBitmap::default(),
+            inode_bitmap: InodeBitmap::default(),
+            inodes: Vec::default(), 
+            blks: Vec::default(), 
+        }
+    }
+}
+
+impl FSState {
+    fn new() -> Self {
+        Self::default()
+    }
+
+    fn alloc_inode(&mut self) -> Option<u64> {
+        // TODO:
     }
 }
 
