@@ -1,11 +1,12 @@
 use fuser::{Filesystem, MountOption};
 use std::env;
+use bitvec::prelude::*;
 
 struct NullFS;
 
 impl Filesystem for NullFS {}
 
-const NUM_DATA_BLK: usize = 250_000; // 1GB FS, can be whatever, can even be made dynamic later
+const NUM_DATA_BLKS: usize = 250_000; // 1GB FS, can be whatever, can even be made dynamic later
 
 // 28 bytes starting at offset 0
 // free inode bitmap can begin at offset 28 and inode table can follow immediately after
@@ -19,9 +20,23 @@ struct SuperBlock {
     wtime: u32,
 }
 
-struct FreeBlockBitMap {
-    map: [u8; NUM_DATA_BLK / 8 + 1],
+trait FreeObjectBitMap {
+    fn new() -> Self {
+        Self {
+            bitmap: BitArray::ZERO
+        }
+    }
+
+    fn find_first_free(&self) -> Option<usize> {
+        self.map.first_zero()
+    }
 }
+
+struct FreeBlockBitMap {
+    bitmap: BitArray<[u8; NUM_DATA_BLKS], Lsb0>,
+}
+
+impl FreeObjectBitMap for FreeBlockBitMap {}
 
 
 fn main() {
