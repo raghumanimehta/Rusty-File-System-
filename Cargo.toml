@@ -11,4 +11,4 @@ bitvec = "1.0.1"
 
 [[bin]]
 name = "rusty-file-system"
-path = "main.rs"
+path = "src/main.rs"
