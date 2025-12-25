@@ -1,4 +1,5 @@
 use fuser::{Filesystem, MountOption, FileType};
+use log::{debug, error, log_enabled, info, Level};
 use std::env;
 use bitvec::prelude::*;
 
@@ -6,34 +7,36 @@ use bitvec::prelude::*;
 struct NullFS;
 impl Filesystem for NullFS {}
 
-const BLK_SIZE: usize = 4096;
-const FS_SIZE: usize = 512usize * (1usize << 30); 
-const NUM_DATA_BLKS: usize = FS_SIZE / BLK_SIZE;
+// This is the total capacity of the backing storage for the file system
+// this includes the space used for the superblock, free object bitmaps, and file data and metadata
+const FS_SIZE_BYTES: u64 = 1u64 * (0b1 << 30) as u64; // 1 GB, toy size
+const BLK_SIZE_BYTES: u64 = 4096u64;
+const NUM_DATA_BLKS: u32 = (FS_SIZE_BYTES / BLK_SIZE_BYTES) as u32;
+const FREE_BLK_BMAP_SIZE_BYTES: usize = ((NUM_DATA_BLKS + 7) / 8) as usize;
 
-const DATA_BLK_BITMAP_BYTES: usize = (NUM_DATA_BLKS + 7) / 8;
-const NUM_INODES: usize = 
-const BITMAP_SIZE_BYTES: usize = 4096;
-const NUM_DIRECT_PTR: usize = 12;
+// Inodes
+const MAX_NUM_INODES: u32 = 10; // toy size
+const FREE_INODE_BMAP_SIZE_BYTES: usize = ((MAX_NUM_INODES + 7) / 8) as usize;
+const NUM_INO_DIRECT_PTR: usize = 12;
 
-// 28 bytes starting at offset 0
-// free inode bitmap can begin at offset 28 and inode table can follow immediately after
+// free inode bitmap can begin right after this struct and inode table can follow immediately after
 struct SuperBlock {
     ino_count: u32,
     blk_count: u32,
     free_blk_count: u32,
     free_ino_count: u32,
     super_blk_no: u32,
-    mtime: u32,
-    wtime: u32,
+    mtime: u64,
+    wtime: u64,
 }
 
 impl Default for SuperBlock {
     fn default() -> Self {
         Self {
-            ino_count: 0,
-            blk_count: NUM_DATA_BLKS as u32,
-            free_blk_count: NUM_DATA_BLKS as u32,
-            free_ino_count: 0,
+            ino_count: MAX_NUM_INODES,
+            blk_count: NUM_DATA_BLKS,
+            free_blk_count: NUM_DATA_BLKS - 3u32, // first three blocks are reserved for FS metadata 
+            free_ino_count: MAX_NUM_INODES - 1, // first inode is reserved for the root
             super_blk_no: 0,
             mtime: 0,
             wtime: 0,
@@ -49,27 +52,18 @@ trait FreeObjectBitmap<const N: usize> {
     }
 }
 
+#[derive(Default)]
 struct FreeBlockBitmap {
-    map: BitArray<[u8; DATA_BLK_BITMAP_BYTES], Lsb0>,
+    map: BitArray<[u8; FREE_BLK_BMAP_SIZE_BYTES], Lsb0>,
 }
 
-impl Default for FreeBlockBitmap {
-    fn default() -> Self {
-        Self { map: BitArray::ZERO }
-    }
-}
+impl FreeObjectBitmap<FREE_BLK_BMAP_SIZE_BYTES> for FreeBlockBitmap {
 
-impl FreeBlockBitmap {
-    fn new() -> Self {
-        Self { map: BitArray::ZERO }
-    }
-}
-
-impl FreeObjectBitmap<DATA_BLK_BITMAP_BYTES> for FreeBlockBitmap {
-    fn map(&self) -> &BitArray<[u8; DATA_BLK_BITMAP_BYTES], Lsb0> {
+    fn map(&self) -> &BitArray<[u8; FREE_BLK_BMAP_SIZE_BYTES], Lsb0> {
         &self.map
     }
 }
+
 
 struct Inode {
     ino_id: u64,            // inode number
@@ -78,62 +72,37 @@ struct Inode {
     mtime_secs: i64,        // Easier to save to disk than SystemTime. Ignored the atime and ctime for now. 
     kind: FileType,  
     perm: u16, 
-    direct_blks: [u32; NUM_DIRECT_PTR], 
+    direct_blks: [u32; NUM_INO_DIRECT_PTR], 
     indirect_blk: u32,
     dbl_indirect_blk: u32,
     tri_indirect_blk: u32, 
 }
 
-struct InodeBitmap {
-    map: BitArray<[u8; BITMAP_SIZE_BYTES], Lsb0>,
+#[derive(Default)]
+struct FreeInodeBitmap {
+    map: BitArray<[u8; FREE_INODE_BMAP_SIZE_BYTES], Lsb0>,
 }
 
-impl Default for InodeBitmap {
-    fn default() -> Self {
-        Self { map: BitArray::ZERO }
-    }
-}
+impl FreeObjectBitmap<FREE_INODE_BMAP_SIZE_BYTES> for FreeInodeBitmap {
 
-impl InodeBitmap {
-    fn new() -> Self {
-        Self { map: BitArray::ZERO }
-    }
-}
-
-impl FreeObjectBitmap<BITMAP_SIZE_BYTES> for InodeBitmap {
-    fn map(&self) -> &BitArray<[u8; BITMAP_SIZE_BYTES], Lsb0> {
+    fn map(&self) -> &BitArray<[u8; FREE_INODE_BMAP_SIZE_BYTES], Lsb0> {
         &self.map
     }
 }
 
+#[derive(Default)]
 struct FSState {
-    superblock: SuperBlock,
-    free_blocks: FreeBlockBitmap,
-    inode_bitmap: InodeBitmap,
+    superblk: SuperBlock,
+    free_blks: FreeBlockBitmap,
+    inode_bitmap: FreeInodeBitmap,
     inodes: Vec<Inode>,
     blks: Vec<u8>, 
 }
 
-impl Default for FSState {
-    fn default() -> Self {
-        Self {
-            // TODO: Fix 
-            superblock: SuperBlock::default(),
-            free_blocks: FreeBlockBitmap::default(),
-            inode_bitmap: InodeBitmap::default(),
-            inodes: Vec::default(), 
-            blks: Vec::default(), 
-        }
-    }
-}
-
 impl FSState {
-    fn new() -> Self {
-        Self::default()
-    }
 
     fn alloc_inode(&mut self) -> Option<u64> {
-        // TODO:
+        None
     }
 }
 
