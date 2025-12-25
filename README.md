@@ -1,4 +1,5 @@
 # Rusty-File-System-
+[![Tests](https://github.com/raghumanimehta/Rusty-File-System-/actions/workflows/tests.yml/badge.svg)](https://github.com/raghumanimehta/Rusty-File-System-/actions/workflows/tests.yml)
 
 ## To Run
 ```
