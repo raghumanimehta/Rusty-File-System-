@@ -36,8 +36,8 @@ impl Default for SuperBlock {
         Self {
             ino_count: MAX_NUM_INODES,
             blk_count: NUM_DATA_BLKS,
-            free_blk_count: NUM_DATA_BLKS - 3u32, // first three blocks are reserved for FS metadata
-            free_ino_count: MAX_NUM_INODES - 1,   // first inode is reserved for the root
+            free_blk_count: NUM_DATA_BLKS, // first three blocks are reserved for FS metadata
+            free_ino_count: MAX_NUM_INODES,   // first inode is reserved for the root
             super_blk_no: 0,
             mtime: 0,
             wtime: 0,
@@ -138,6 +138,9 @@ impl FSState {
             }
         };
 
+        // TODO: add root inode logic 
+        // TODO: Block first two blocks.
+        // TODO: Reserved ones  
         // mark inode allocated in bitmap
         self.inode_bitmap.map.set(ino_idx, true);
 
