@@ -11,7 +11,7 @@ impl Filesystem for NullFS {}
 // this includes the space used for the FSMetadata, free object bitmaps, and file data and metadata
 const FS_SIZE_BYTES: u64 = 1u64 * (0b1 << 30) as u64; // 1 GB
 const BLK_SIZE_BYTES: u64 = 4096u64;
-// 0 -> FSMetadata, 1->InodeBitmap, 2 -> Freeblock bitmap 
+// 0 -> FSMetadata, 1->InodeBitmap, 2 -> Freeblock bitmap
 const RESERVED_DATA_BLKS: u32 = 3;
 const NUM_DATA_BLKS: u32 = (FS_SIZE_BYTES / BLK_SIZE_BYTES) as u32;
 const FREE_BLK_BMAP_SIZE_BYTES: usize = ((NUM_DATA_BLKS + 7) / 8) as usize;
@@ -55,15 +55,14 @@ struct Block {
 
 #[derive(Debug)]
 enum BitMapError {
-    RestrictedEntry, 
+    RestrictedEntry,
     AlreadyAlloced,
-    AlreadyFree
+    AlreadyFree,
 }
-    
 
 trait FreeObjectBitmap<const N: usize> {
-    const RESERVED: usize; 
-    const MAX: usize; 
+    const RESERVED: usize;
+    const MAX: usize;
 
     fn map(&mut self) -> &mut BitArray<[u8; N], Lsb0>;
 
@@ -78,12 +77,12 @@ trait FreeObjectBitmap<const N: usize> {
 
     fn set_alloc(&mut self, idx: usize) -> Result<(), BitMapError> {
         if idx < Self::RESERVED || idx > Self::MAX {
-            return Err(BitMapError::RestrictedEntry)
-        } 
+            return Err(BitMapError::RestrictedEntry);
+        }
         if self.map()[idx] == true {
             error!("The index is already alloced, no change");
-            return Err(BitMapError::AlreadyAlloced); 
-        } else { 
+            return Err(BitMapError::AlreadyAlloced);
+        } else {
             self.map().set(idx, true);
             Ok(())
         }
@@ -91,12 +90,12 @@ trait FreeObjectBitmap<const N: usize> {
 
     fn set_free(&mut self, idx: usize) -> Result<(), BitMapError> {
         if idx < Self::RESERVED || idx > Self::MAX {
-            return Err(BitMapError::RestrictedEntry)
-        } 
+            return Err(BitMapError::RestrictedEntry);
+        }
         if self.map()[idx] == false {
             error!("The index is already free, no change");
-            return Err(BitMapError::AlreadyFree); 
-        } else { 
+            return Err(BitMapError::AlreadyFree);
+        } else {
             self.map().set(idx, false);
             Ok(())
         }
@@ -116,7 +115,7 @@ impl Default for FreeBlockBitmap {
 }
 
 impl FreeObjectBitmap<FREE_BLK_BMAP_SIZE_BYTES> for FreeBlockBitmap {
-    const RESERVED: usize = RESERVED_DATA_BLKS as usize; 
+    const RESERVED: usize = RESERVED_DATA_BLKS as usize;
     const MAX: usize = NUM_DATA_BLKS as usize;
     fn map(&mut self) -> &mut BitArray<[u8; FREE_BLK_BMAP_SIZE_BYTES], Lsb0> {
         &mut self.map
@@ -193,10 +192,10 @@ struct FSState {
 enum InodeError {
     NoFreeInodesOnAlloc,
     InodeNotFound,
-    InvalidInoId
+    InvalidInoId,
 }
 
-impl FSState {} 
+impl FSState {}
 
 // we have to implement Default ourselves here
 // because the Default trait is not implemented for static arrays
@@ -305,7 +304,6 @@ mod tests {
         let mut bitmap = FreeInodeBitmap::default();
         let result = bitmap.set_free(MAX_NUM_INODES as usize + 1);
         assert!(matches!(result, Err(BitMapError::RestrictedEntry)));
-       
     }
 
     #[test]
@@ -327,11 +325,11 @@ mod tests {
     fn test_free_block_bitmap_set_alloc_and_free() {
         let mut bitmap = FreeBlockBitmap::default();
         let idx = RESERVED_DATA_BLKS as usize;
-        
+
         // Allocate
         assert!(bitmap.set_alloc(idx).is_ok());
         assert_eq!(bitmap.map[idx], true);
-        
+
         // Free
         assert!(bitmap.set_free(idx).is_ok());
         assert_eq!(bitmap.map[idx], false);
