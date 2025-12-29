@@ -68,16 +68,12 @@ trait FreeObjectBitmap<const N: usize> {
     fn map(&mut self) -> &mut BitArray<[u8; N], Lsb0>;
 
     fn find_first_free(&mut self) -> Option<usize> {
-        match self.map().first_zero() {
-            Some(idx) => {
-                if idx < Self::RESERVED {
-                    None
-                } else {
-                    Some(idx)
-                }
+        for idx in Self::RESERVED..Self::MAX {
+            if !self.map()[idx] {
+                return Some(idx);
             }
-            None => None,
         }
+        None
     }
 
     fn set_alloc(&mut self, idx: usize) -> Result<(), BitMapError> {
@@ -85,8 +81,8 @@ trait FreeObjectBitmap<const N: usize> {
             return Err(BitMapError::RestrictedEntry)
         } 
         if self.map()[idx] == true {
-            error!("The index is already alloced, no change")
-            return Err(BitMapError::AlreadyAlloced) 
+            error!("The index is already alloced, no change");
+            return Err(BitMapError::AlreadyAlloced); 
         } else { 
             self.map().set(idx, true);
             Ok(())
@@ -98,8 +94,8 @@ trait FreeObjectBitmap<const N: usize> {
             return Err(BitMapError::RestrictedEntry)
         } 
         if self.map()[idx] == false {
-            error!("The index is already free, no change")
-            return Err(BitMapError::AlreadyFree) 
+            error!("The index is already free, no change");
+            return Err(BitMapError::AlreadyFree); 
         } else { 
             self.map().set(idx, false);
             Ok(())
@@ -200,45 +196,7 @@ enum InodeError {
     InvalidInoId
 }
 
-impl FSState {
-    fn alloc_inode(&mut self, kind: FileType, perm: u16) -> Result<u64, InodeError> {
-        let ino_idx: usize = match self.inode_bitmap.find_first_free() {
-            Some(idx) => idx,
-            None => {
-                error!("alloc_inode failed: no free inodes");
-                return Err(InodeError::NoFreeInodesOnAlloc);
-            }
-        };
-
-        // TODO: add root inode logic 
-        // TODO: Block first two blocks.
-        // TODO: Reserved ones  
-        // mark inode allocated in bitmap
-        self.inode_bitmap.map.set(ino_idx, true);
-
-        // The true index is 0, but we use 0 as an invalid ptr so always 
-        // increment when storing ptrs 
-        let ino_id: u64 = (ino_idx + 1) as u64; 
-        self.inodes[ino_idx] = Some(Inode::new(ino_id, kind, perm));
-
-        Ok(ino_id)
-    }
-
-    fn fnid_inode_by_id(&self, ino_id: u64) -> Result<&Inode, InodeError> {
-        if ino_id <= 0 {
-            return Err(InodeError::InvalidInoId);
-        }
-        let ino_idx = (ino_id - 1) as usize;
-        if ino_idx >= (MAX_NUM_INODES as usize) {
-            return Err(InodeError::InodeNotFound);
-        }
-
-        match self.inodes[ino_idx].as_ref() {
-            Some(inode) => Ok(inode),
-            None => Err(InodeError::InodeNotFound),
-        } 
-    }
-} 
+impl FSState {} 
 
 // we have to implement Default ourselves here
 // because the Default trait is not implemented for static arrays
@@ -265,4 +223,121 @@ fn main() {
     env_logger::init();
     let mountpoint = env::args_os().nth(1).unwrap();
     fuser::mount2(NullFS, mountpoint, &[MountOption::AutoUnmount]).unwrap();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Test find_first_free
+    #[test]
+    fn test_find_first_free_returns_first_unreserved_index() {
+        let mut bitmap = FreeInodeBitmap::default();
+        assert_eq!(bitmap.find_first_free(), Some(RESERVED_INODES as usize));
+    }
+
+    #[test]
+    fn test_find_first_free_skips_allocated_indices() {
+        let mut bitmap = FreeInodeBitmap::default();
+        bitmap.map.set(2, true);
+        assert_eq!(bitmap.find_first_free(), Some(3));
+    }
+
+    #[test]
+    fn test_find_first_free_returns_none_when_full() {
+        let mut bitmap = FreeInodeBitmap::default();
+        bitmap.map.fill(true);
+        assert_eq!(bitmap.find_first_free(), None);
+    }
+
+    // Test set_alloc
+    #[test]
+    fn test_set_alloc_succeeds_for_valid_free_index() {
+        let mut bitmap = FreeInodeBitmap::default();
+        let idx = RESERVED_INODES as usize;
+        assert!(bitmap.set_alloc(idx).is_ok());
+        assert_eq!(bitmap.map[idx], true);
+    }
+
+    #[test]
+    fn test_set_alloc_fails_for_reserved_index() {
+        let mut bitmap = FreeInodeBitmap::default();
+        let result = bitmap.set_alloc(0);
+        assert!(matches!(result, Err(BitMapError::RestrictedEntry)));
+    }
+
+    #[test]
+    fn test_set_alloc_fails_for_index_beyond_max() {
+        let mut bitmap = FreeInodeBitmap::default();
+        let result = bitmap.set_alloc(MAX_NUM_INODES as usize + 1);
+        assert!(matches!(result, Err(BitMapError::RestrictedEntry)));
+    }
+
+    #[test]
+    fn test_set_alloc_fails_for_already_allocated_index() {
+        let mut bitmap = FreeInodeBitmap::default();
+        let idx = RESERVED_INODES as usize;
+        bitmap.map.set(idx, true);
+        let result = bitmap.set_alloc(idx);
+        assert!(matches!(result, Err(BitMapError::AlreadyAlloced)));
+    }
+
+    // Test set_free
+    #[test]
+    fn test_set_free_succeeds_for_valid_allocated_index() {
+        let mut bitmap = FreeInodeBitmap::default();
+        let idx = RESERVED_INODES as usize;
+        bitmap.map.set(idx, true); // First allocate it
+        assert!(bitmap.set_free(idx).is_ok());
+        assert_eq!(bitmap.map[idx], false);
+    }
+
+    #[test]
+    fn test_set_free_fails_for_reserved_index() {
+        let mut bitmap = FreeInodeBitmap::default();
+        let result = bitmap.set_free(0);
+        assert!(matches!(result, Err(BitMapError::RestrictedEntry)));
+        assert_eq!(bitmap.map[0], true)
+    }
+
+    #[test]
+    fn test_set_free_fails_for_index_beyond_max() {
+        let mut bitmap = FreeInodeBitmap::default();
+        let result = bitmap.set_free(MAX_NUM_INODES as usize + 1);
+        assert!(matches!(result, Err(BitMapError::RestrictedEntry)));
+       
+    }
+
+    #[test]
+    fn test_set_free_fails_for_already_free_index() {
+        let mut bitmap = FreeInodeBitmap::default();
+        let idx = RESERVED_INODES as usize;
+        let mut result = bitmap.set_alloc((RESERVED_INODES as usize) + 1);
+        assert!(result.is_ok());
+        let mut clone = FreeInodeBitmap::default();
+        clone.set_alloc((RESERVED_INODES as usize) + 1)
+        let result = bitmap.set_free(idx);
+        assert!(matches!(result, Err(BitMapError::AlreadyFree)));
+    }
+
+    // Test with FreeBlockBitmap to ensure trait works for both implementations
+    #[test]
+    fn test_free_block_bitmap_find_first_free() {
+        let mut bitmap = FreeBlockBitmap::default();
+        assert_eq!(bitmap.find_first_free(), Some(RESERVED_DATA_BLKS as usize));
+    }
+
+    #[test]
+    fn test_free_block_bitmap_set_alloc_and_free() {
+        let mut bitmap = FreeBlockBitmap::default();
+        let idx = RESERVED_DATA_BLKS as usize;
+        
+        // Allocate
+        assert!(bitmap.set_alloc(idx).is_ok());
+        assert_eq!(bitmap.map[idx], true);
+        
+        // Free
+        assert!(bitmap.set_free(idx).is_ok());
+        assert_eq!(bitmap.map[idx], false);
+    }
 }
