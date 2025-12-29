@@ -196,9 +196,7 @@ enum InodeError {
     InvalidInoId
 }
 
-impl FSState {
-    
-} 
+impl FSState {} 
 
 // we have to implement Default ourselves here
 // because the Default trait is not implemented for static arrays
