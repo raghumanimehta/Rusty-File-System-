@@ -197,43 +197,7 @@ enum InodeError {
 }
 
 impl FSState {
-    fn alloc_inode(&mut self, kind: FileType, perm: u16) -> Result<u64, InodeError> {
-        let ino_idx: usize = match self.inode_bitmap.find_first_free() {
-            Some(idx) => idx,
-            None => {
-                error!("alloc_inode failed: no free inodes");
-                return Err(InodeError::NoFreeInodesOnAlloc);
-            }
-        };
-
-        // TODO: add root inode logic 
-        // TODO: Block first two blocks.
-        // TODO: Reserved ones  
-        // mark inode allocated in bitmap
-        self.inode_bitmap.map.set(ino_idx, true);
-
-        // The true index is 0, but we use 0 as an invalid ptr so always 
-        // increment when storing ptrs 
-        let ino_id: u64 = (ino_idx + 1) as u64; 
-        self.inodes[ino_idx] = Some(Inode::new(ino_id, kind, perm));
-
-        Ok(ino_id)
-    }
-
-    fn fnid_inode_by_id(&self, ino_id: u64) -> Result<&Inode, InodeError> {
-        if ino_id <= 0 {
-            return Err(InodeError::InvalidInoId);
-        }
-        let ino_idx = (ino_id - 1) as usize;
-        if ino_idx >= (MAX_NUM_INODES as usize) {
-            return Err(InodeError::InodeNotFound);
-        }
-
-        match self.inodes[ino_idx].as_ref() {
-            Some(inode) => Ok(inode),
-            None => Err(InodeError::InodeNotFound),
-        } 
-    }
+    
 } 
 
 // we have to implement Default ourselves here
