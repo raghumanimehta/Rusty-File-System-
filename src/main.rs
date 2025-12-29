@@ -124,9 +124,9 @@ impl FreeObjectBitmap<FREE_BLK_BMAP_SIZE_BYTES> for FreeBlockBitmap {
 
 #[derive(Clone, Copy)]
 struct Inode {
-    ino_id: u64,     // inode number
+    ino_id: u32,     // inode number
     size: u64,       // file size
-    blocks: u64,     // num blocks allocated
+    blocks: u32,     // num blocks allocated
     mtime_secs: i64, // Easier to save to disk than SystemTime. Ignored the atime and ctime for now.
     kind: FileType,
     perm: u16,
@@ -144,7 +144,7 @@ fn secs_from_unix_epoch() -> i64 {
 }
 
 impl Inode {
-    fn new(ino_id: u64, kind: FileType, perm: u16) -> Self {
+    fn new(ino_id: u32, kind: FileType, perm: u16) -> Self {
         Self {
             ino_id,
             size: 0,
@@ -195,8 +195,6 @@ enum InodeError {
     InvalidInoId,
 }
 
-impl FSState {}
-
 // we have to implement Default ourselves here
 // because the Default trait is not implemented for static arrays
 // above a certain size
@@ -214,6 +212,42 @@ impl Default for FSState {
             inodes,
             free_blk_bitmap,
             blks,
+        }
+    }
+}
+
+
+impl FSState {
+    fn new(
+        metadata: FSMetadata,
+        inode_bitmap: FreeInodeBitmap,
+        inodes: [Option<Inode>; MAX_NUM_INODES as usize],
+        free_blk_bitmap: FreeBlockBitmap,
+        blks: [Option<Block>; NUM_DATA_BLKS as usize],
+    ) -> Self {
+        Self {
+            metadata,
+            inode_bitmap,
+            inodes,
+            free_blk_bitmap,
+            blks,
+        }
+    }
+
+    fn alloc_inode(&mut self) -> Result<u32, InodeError> {
+        let ino_bm = &mut self.inode_bitmap;
+        match ino_bm.find_first_free() {
+            Some(idx) => {
+                match self.inode_bitmap.set_alloc(idx) {
+                    Ok(()) => Ok(idx as u32),
+                    Err(err) => match err {
+                        BitMapError::RestrictedEntry => Err(InodeError::InvalidInoId),
+                        BitMapError::AlreadyAlloced => Err(InodeError::NoFreeInodesOnAlloc),
+                        BitMapError::AlreadyFree => Err(InodeError::NoFreeInodesOnAlloc),
+                    },
+                }
+            }
+            None => Err(InodeError::InodeNotFound),
         }
     }
 }
