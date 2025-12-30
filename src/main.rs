@@ -222,14 +222,14 @@ impl FSState {
         metadata: FSMetadata,
         inode_bitmap: FreeInodeBitmap,
         inodes: [Option<Inode>; MAX_NUM_INODES as usize],
-        free_blk_bitmap: FreeBlockBitmap,
+        blk_bitmap: FreeBlockBitmap,
         blks: [Option<Block>; NUM_DATA_BLKS as usize],
     ) -> Self {
         Self {
             metadata,
             inode_bitmap,
             inodes,
-            free_blk_bitmap,
+            blk_bitmap,
             blks,
         }
     }
