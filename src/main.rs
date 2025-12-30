@@ -76,7 +76,7 @@ trait FreeObjectBitmap<const N: usize> {
     }
 
     fn set_alloc(&mut self, idx: usize) -> Result<(), BitMapError> {
-        if idx < Self::RESERVED || idx > Self::MAX {
+        if idx < Self::RESERVED || idx >= Self::MAX {
             return Err(BitMapError::RestrictedEntry);
         }
         if self.map()[idx] == true {
@@ -89,7 +89,7 @@ trait FreeObjectBitmap<const N: usize> {
     }
 
     fn set_free(&mut self, idx: usize) -> Result<(), BitMapError> {
-        if idx < Self::RESERVED || idx > Self::MAX {
+        if idx < Self::RESERVED || idx >= Self::MAX {
             return Err(BitMapError::RestrictedEntry);
         }
         if self.map()[idx] == false {
@@ -184,7 +184,7 @@ struct FSState {
     metadata: FSMetadata,
     inode_bitmap: FreeInodeBitmap,
     inodes: [Option<Inode>; MAX_NUM_INODES as usize],
-    free_blk_bitmap: FreeBlockBitmap,
+    blk_bitmap: FreeBlockBitmap,
     blks: [Option<Block>; NUM_DATA_BLKS as usize],
 }
 
@@ -203,14 +203,14 @@ impl Default for FSState {
         let metadata = FSMetadata::default();
         let inode_bitmap = FreeInodeBitmap::default();
         let inodes = [None; MAX_NUM_INODES as usize];
-        let free_blk_bitmap = FreeBlockBitmap::default();
+        let blk_bitmap = FreeBlockBitmap::default();
         let blks = [None; NUM_DATA_BLKS as usize];
 
         Self {
             metadata,
             inode_bitmap,
             inodes,
-            free_blk_bitmap,
+            blk_bitmap,
             blks,
         }
     }
@@ -367,5 +367,18 @@ mod tests {
         // Free
         assert!(bitmap.set_free(idx).is_ok());
         assert_eq!(bitmap.map[idx], false);
+    }
+
+    #[test]
+    fn test_free_block_bitmap_max() {
+        let mut bitmap = FreeBlockBitmap::default();
+        let idx = NUM_DATA_BLKS as usize;
+        let idx2 = 4 as usize;
+
+        assert!(bitmap.set_alloc(idx2).is_ok());
+        assert_eq!(bitmap.map[idx2], true);
+
+        let result = bitmap.set_alloc(idx);
+        assert!(matches!(result, Err(BitMapError::RestrictedEntry)));
     }
 }
