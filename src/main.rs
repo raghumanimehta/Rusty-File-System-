@@ -184,7 +184,7 @@ struct FSState {
     metadata: FSMetadata,
     inode_bitmap: FreeInodeBitmap,
     inodes: [Option<Inode>; MAX_NUM_INODES as usize],
-    blk_bitmap : FreeBlockBitmap,
+    blk_bitmap: FreeBlockBitmap,
     blks: [Option<Block>; NUM_DATA_BLKS as usize],
 }
 
@@ -205,14 +205,14 @@ impl Default for FSState {
         let metadata = FSMetadata::default();
         let inode_bitmap = FreeInodeBitmap::default();
         let inodes = [None; MAX_NUM_INODES as usize];
-        let blk_bitmap  = FreeBlockBitmap::default();
+        let blk_bitmap = FreeBlockBitmap::default();
         let blks = [None; NUM_DATA_BLKS as usize];
 
         Self {
             metadata,
             inode_bitmap,
             inodes,
-            blk_bitmap ,
+            blk_bitmap,
             blks,
         }
     }
