@@ -549,6 +549,9 @@ mod tests {
             (MAX_NUM_INODES - RESERVED_INODES) as usize
         );
 
+        assert_eq!(fsstate.metadata.ino_count, MAX_NUM_INODES);
+        assert_eq!(fsstate.metadata.free_ino_count, 0);
+
         // Try to allocate one more - should fail
         let result = fsstate.alloc_inode(FileType::RegularFile, 0);
         assert!(result.is_err());
