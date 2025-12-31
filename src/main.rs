@@ -472,19 +472,6 @@ mod tests {
         assert_eq!(fsstate.inodes[ino_id as usize], None);
     }
 
-    fn create_basic_fs() {
-        let fsstate = &mut FSState::default();
-        // allocate two inodes
-        match fsstate.alloc_inode(FileType::RegularFile, 0) {
-            Ok(_) => (),
-            Err(e) => panic!("Failed to allocate inode: {:?}", e),
-        }
-        match fsstate.alloc_inode(FileType::RegularFile, 0) {
-            Ok(_) => (),
-            Err(e) => panic!("Failed to allocate inode: {:?}", e),
-        }
-    }
-
     #[test]
     fn test_free_inode_once_succeeds_twice_fails() {
         let fsstate = &mut FSState::default();
