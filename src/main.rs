@@ -37,8 +37,8 @@ struct FSMetadata {
 impl Default for FSMetadata {
     fn default() -> Self {
         Self {
-            ino_count: RESERVED_INODES, // Start with reserved inodes, these show how many inodes are there not the maximum
-            blk_count: RESERVED_DATA_BLKS, // Start with reserved blocks
+            ino_count: MAX_NUM_INODES,
+            blk_count: NUM_DATA_BLKS,
             free_blk_count: NUM_DATA_BLKS - RESERVED_DATA_BLKS,
             free_ino_count: MAX_NUM_INODES - RESERVED_INODES,
             super_blk_no: 0,
@@ -54,26 +54,29 @@ enum FSMetadataError {
     InoCountBelowReserved,
 }
 impl FSMetadata {
-    fn increment_ino_count(&mut self) -> Result<(), FSMetadataError> {
-        if self.ino_count >= MAX_NUM_INODES {
-            // Can check the lower bound as well. This was a design choice with little consequence.
-            error!("Attempted to increase the inode count above max: {MAX_NUM_INODES}");
-            Err(FSMetadataError::InoCountExceedingMax)
+    fn dec_free_ino_count(&mut self) -> Result<(), FSMetadataError> {
+        if self.free_ino_count < 0 {
+            error!(
+                "Attempted to decrease the inode count below reserved: {}",
+                { RESERVED_INODES }
+            );
+            Err(FSMetadataError::InoCountBelowReserved)
         } else {
             self.free_ino_count -= 1;
-            self.ino_count += 1;
             self.mtime = secs_from_unix_epoch() as u64;
             Ok(())
         }
     }
 
-    fn decrement_ino_count(&mut self) -> Result<(), FSMetadataError> {
-        if self.ino_count <= RESERVED_INODES {
-            error!("Attempted to decrease the inode count below reserved: {RESERVED_INODES}");
-            Err(FSMetadataError::InoCountBelowReserved)
+    fn inc_free_ino_count(&mut self) -> Result<(), FSMetadataError> {
+        if self.free_ino_count >= (MAX_NUM_INODES - RESERVED_INODES) {
+            error!(
+                "Attempted to increase the inode count above max: {}",
+                MAX_NUM_INODES - RESERVED_INODES
+            );
+            Err(FSMetadataError::InoCountExceedingMax)
         } else {
             self.free_ino_count += 1;
-            self.ino_count -= 1;
             self.mtime = secs_from_unix_epoch() as u64;
             Ok(())
         }
@@ -302,7 +305,7 @@ impl FSState {
             .map_err(|_| InodeError::NoFreeInodesOnAlloc)?;
 
         self.metadata
-            .increment_ino_count()
+            .dec_free_ino_count()
             .map_err(|_| InodeError::NoFreeInodesOnAlloc)?;
 
         self.inodes[idx] = Some(Inode::new(idx as u32, kind, perm));
@@ -319,7 +322,7 @@ impl FSState {
         })?;
 
         self.metadata
-            .decrement_ino_count()
+            .inc_free_ino_count()
             .map_err(|_| InodeError::InvalidInoId)?;
 
         self.inodes[idx] = None;
@@ -583,17 +586,16 @@ mod tests {
     fn test_metadata_counts_during_alloc_and_free() {
         let fsstate = &mut FSState::default();
 
-        let initial_ino_count = fsstate.metadata.ino_count;
         let initial_free_count = fsstate.metadata.free_ino_count;
 
         // Allocate
         let ino = fsstate.alloc_inode(FileType::RegularFile, 0).unwrap();
-        assert_eq!(fsstate.metadata.ino_count, initial_ino_count + 1);
+        assert_eq!(fsstate.metadata.ino_count, MAX_NUM_INODES);
         assert_eq!(fsstate.metadata.free_ino_count, initial_free_count - 1);
 
         // Free
         fsstate.free_inode(ino).unwrap();
-        assert_eq!(fsstate.metadata.ino_count, initial_ino_count);
+        assert_eq!(fsstate.metadata.ino_count, MAX_NUM_INODES);
         assert_eq!(fsstate.metadata.free_ino_count, initial_free_count);
     }
 
