@@ -175,23 +175,6 @@ struct Inode {
     tri_indirect_blk: u32,
 }
 
-impl Default for Inode {
-    fn default() -> Self {
-        Self {
-            ino_id: 0,
-            size: 0,
-            blocks: 0,
-            mtime_secs: 0,
-            kind: FileType::RegularFile,
-            perm: 0,
-            direct_blks: [INVALID_PTR; NUM_INO_DIRECT_PTR],
-            indirect_blk: INVALID_PTR,
-            dbl_indirect_blk: INVALID_PTR,
-            tri_indirect_blk: INVALID_PTR,
-        }
-    }
-}
-
 fn secs_from_unix_epoch() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
