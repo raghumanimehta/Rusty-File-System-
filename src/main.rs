@@ -239,9 +239,6 @@ enum InodeError {
     BitmapError(BitMapError),
 }
 
-// we have to implement Default ourselves here
-// because the Default trait is not implemented for static arrays
-// above a certain size
 impl Default for FSState {
     fn default() -> Self {
         let metadata = FSMetadata::default();
