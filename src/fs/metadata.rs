@@ -50,6 +50,8 @@ impl Default for FSMetadata {
 pub enum FSMetadataError {
     InoCountExceedingMax,
     InoCountBelowReserved,
+    BlkCountExceedingMax,
+    BlkCountBelowReserved,
 }
 
 impl FSMetadata {
@@ -78,6 +80,28 @@ impl FSMetadata {
             self.free_ino_count += 1;
             self.mtime = secs_from_unix_epoch() as u64;
             Ok(())
+        }
+    }
+
+    pub fn dec_free_blk_count(&mut self) -> Result<(), FSMetadataError> {
+        if self.free_blk_count > 0 {
+            self.free_blk_count -= 1;
+            self.mtime = secs_from_unix_epoch() as u64;
+            Ok(())
+        } else {
+            error!("Attempted to decrease free block count below zero");
+            Err(FSMetadataError::BlkCountBelowReserved)
+        }
+    }
+    
+    pub fn inc_free_blk_count(&mut self) -> Result<(), FSMetadataError> {
+        if self.free_blk_count < (NUM_DATA_BLKS - RESERVED_DATA_BLKS) {
+            self.free_blk_count += 1;
+            self.mtime = secs_from_unix_epoch() as u64;
+            Ok(())
+        } else {
+            error!("Attempted to increase free block count above max");
+            Err(FSMetadataError::BlkCountExceedingMax)
         }
     }
 }

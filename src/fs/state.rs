@@ -45,6 +45,11 @@ impl Default for FSState {
     }
 }
 
+pub enum FSStateError {
+    InodeError(InodeError),
+    BitMapError(BitMapError),
+}
+
 impl FSState {
     pub fn new(
         metadata: FSMetadata,
@@ -87,6 +92,7 @@ impl FSState {
             BitMapError::RestrictedEntry => InodeError::InvalidInoId,
             BitMapError::AlreadyFree => InodeError::BitmapError(BitMapError::AlreadyFree),
             BitMapError::AlreadyAlloced => InodeError::BitmapError(BitMapError::AlreadyAlloced),
+            BitMapError::NoFreeEntriesOnAlloc => InodeError::BitmapError(BitMapError::NoFreeEntriesOnAlloc),
         })?;
 
         self.metadata
@@ -96,4 +102,41 @@ impl FSState {
         self.inodes[idx] = None;
         Ok(())
     }
+
+    pub fn alloc_blk(&mut self) -> Result<u32, BitMapError> {
+        let idx = self
+            .blk_bitmap
+            .find_first_free()
+            .ok_or(BitMapError::NoFreeEntriesOnAlloc)?;
+
+        self.blk_bitmap.set_alloc(idx)?;
+
+        self.metadata
+        .dec_free_blk_count()
+        .map_err(|_| BitMapError::RestrictedEntry)?;
+
+        self.blks[idx] = Some(Block {
+            data: [0u8; BLK_SIZE_BYTES as usize],
+        });
+
+        Ok(idx as u32)
+    }
+
+    pub fn free_blk(&mut self, blk_id: u32) -> Result<(), BitMapError> {
+        let idx = blk_id as usize;
+
+        self.blk_bitmap.set_free(idx)?;
+
+        self.metadata
+        .inc_free_blk_count()
+        .map_err(|_| BitMapError::RestrictedEntry)?;
+
+        self.blks[idx] = None;
+        Ok(())
+    }
+
+    // pub fn create_file(& mut self, kind: FileType, perm: u16) -> Result<&Inode, FSStateError> {
+    //     self.alloc_inode(kind, perm)
+
+    // }
 }

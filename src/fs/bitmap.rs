@@ -1,12 +1,17 @@
 use bitvec::prelude::*;
 use log::error;
-use crate::fs::metadata::{NUM_DATA_BLKS, RESERVED_DATA_BLKS};
+use crate::fs::metadata::{BLK_SIZE_BYTES, NUM_DATA_BLKS, RESERVED_DATA_BLKS, MAX_NUM_INODES, RESERVED_INODES};
+
+
+pub const FREE_BLK_BMAP_SIZE_BYTES: usize = (NUM_DATA_BLKS as usize) / (BLK_SIZE_BYTES as usize);
+pub const FREE_INODE_BMAP_SIZE_BYTES: usize = (MAX_NUM_INODES as usize + 7) / 8;
 
 #[derive(Debug)]
 pub enum BitMapError {
     RestrictedEntry,
     AlreadyAlloced,
     AlreadyFree,
+    NoFreeEntriesOnAlloc
 }
 
 pub trait FreeObjectBitmap<const N: usize> {
@@ -55,7 +60,7 @@ pub trait FreeObjectBitmap<const N: usize> {
 
 
 pub struct FreeBlockBitmap {
-    pub map: BitArray<[u8; 128], Lsb0>,  // FREE_BLK_BMAP_SIZE_BYTES
+    pub map: BitArray<[u8; FREE_BLK_BMAP_SIZE_BYTES], Lsb0>,  
 }
 
 impl Default for FreeBlockBitmap {
@@ -66,18 +71,16 @@ impl Default for FreeBlockBitmap {
     }
 }
 
-impl FreeObjectBitmap<128> for FreeBlockBitmap {
+impl FreeObjectBitmap<FREE_BLK_BMAP_SIZE_BYTES> for FreeBlockBitmap {
     const RESERVED: usize = RESERVED_DATA_BLKS as usize;
     const MAX: usize = NUM_DATA_BLKS as usize;
-    fn map(&mut self) -> &mut BitArray<[u8; 128], Lsb0> {
+    fn map(&mut self) -> &mut BitArray<[u8; FREE_BLK_BMAP_SIZE_BYTES], Lsb0> {
         &mut self.map
     }
 }
 
-use crate::fs::metadata::{MAX_NUM_INODES, RESERVED_INODES};
-
 pub struct FreeInodeBitmap {
-    pub map: BitArray<[u8; 2], Lsb0>,  // FREE_INODE_BMAP_SIZE_BYTES
+    pub map: BitArray<[u8; FREE_INODE_BMAP_SIZE_BYTES], Lsb0>,
 }
 
 impl Default for FreeInodeBitmap {
@@ -88,10 +91,10 @@ impl Default for FreeInodeBitmap {
     }
 }
 
-impl FreeObjectBitmap<2> for FreeInodeBitmap {
+impl FreeObjectBitmap<FREE_INODE_BMAP_SIZE_BYTES> for FreeInodeBitmap {
     const RESERVED: usize = RESERVED_INODES as usize;
     const MAX: usize = MAX_NUM_INODES as usize;
-    fn map(&mut self) -> &mut BitArray<[u8; 2], Lsb0> {
+    fn map(&mut self) -> &mut BitArray<[u8; FREE_INODE_BMAP_SIZE_BYTES], Lsb0> {
         &mut self.map
     }
 }
