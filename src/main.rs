@@ -12,8 +12,8 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use crate::fs::bitmap::{FreeInodeBitmap, FreeBlockBitmap, FreeObjectBitmap, BitMapError};
-    use crate::fs::metadata::{RESERVED_INODES, MAX_NUM_INODES, RESERVED_DATA_BLKS, NUM_DATA_BLKS};
+    use crate::fs::bitmap::{BitMapError, FreeBlockBitmap, FreeInodeBitmap, FreeObjectBitmap};
+    use crate::fs::metadata::{MAX_NUM_INODES, NUM_DATA_BLKS, RESERVED_DATA_BLKS, RESERVED_INODES};
     use crate::fs::state::{FSState, InodeError};
     use fuser::FileType;
 

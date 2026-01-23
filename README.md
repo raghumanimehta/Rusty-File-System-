@@ -15,6 +15,19 @@ RUST_LOG=info cargo run -- /tmp/nullfs
 
 ### TODOs
 
+
+### Main Idea
+
+Rusty-fs is a hybrid tree-based filesystem that operates across two machines:
+
+- **Remote Machine**: Hosts the actual filesystem state (inodes, blocks, metadata) and persists data to disk
+- **Local Machine**: Mounts the filesystem via FUSE and communicates with the Remote to perform file operations
+
+**Key Architecture:**
+- Local FUSE layer translates system calls into remote operations
+- Remote manages all filesystem logic, allocation, and storage
+- Communication layer handles state synchronization between Local and Remote
+
 **Completed:**
 - [x] Set up Rust project structure with Cargo.toml
 - [x] Implement basic FUSE filesystem mounting

@@ -1,7 +1,8 @@
-use fuser::FileType;
-use crate::fs::metadata::{FSMetadata, MAX_NUM_INODES};
 use crate::fs::bitmap::{BitMapError, FreeBlockBitmap, FreeInodeBitmap, FreeObjectBitmap};
-use crate::fs::inode::Inode;
+use crate::fs::inode::{Inode, InodeError, ROOT_INO};
+use crate::fs::metadata::{FSMetadata, MAX_NUM_INODES};
+use fuser::FileType;
+use log::error;
 
 pub const BLK_SIZE_BYTES: u64 = 4096u64;
 pub const NUM_DATA_BLKS: u32 = 262144u32; // 1GB / 4KB
@@ -9,14 +10,6 @@ pub const NUM_DATA_BLKS: u32 = 262144u32; // 1GB / 4KB
 #[derive(Clone, Copy)]
 pub struct Block {
     pub data: [u8; BLK_SIZE_BYTES as usize],
-}
-
-#[derive(Debug)]
-pub enum InodeError {
-    NoFreeInodesOnAlloc,
-    InodeNotFound,
-    InvalidInoId,
-    BitmapError(BitMapError),
 }
 
 pub struct FSState {
@@ -28,6 +21,8 @@ pub struct FSState {
 }
 
 impl Default for FSState {
+    /// Creates a brand new filesystem with initialized root directory
+    /// Use this when initializing a new filesystem on the Remote for the first time
     fn default() -> Self {
         let metadata = FSMetadata::default();
         let inode_bitmap = FreeInodeBitmap::default();
@@ -51,6 +46,8 @@ pub enum FSStateError {
 }
 
 impl FSState {
+    /// Loads an existing filesystem state from Remote
+    /// Use this when reconnecting to an already-initialized filesystem
     pub fn new(
         metadata: FSMetadata,
         inode_bitmap: FreeInodeBitmap,
@@ -85,6 +82,21 @@ impl FSState {
         Ok(idx as u32)
     }
 
+    pub fn read_ino_alloc(&mut self, read_ino: Inode) -> Result<u32, InodeError> {
+        let idx = read_ino.ino_id as usize;
+        let is_alloced = self.inode_bitmap.is_alloced(idx);
+        match is_alloced {
+            Ok(res) => {
+                if res {
+                    error!("Tried to acces restricted index: {idx}");
+                    return Err(InodeError::BitmapError(BitMapError::AlreadyAlloced));
+                }
+                self.inodes[idx] = Some(read_ino);
+                Ok(idx as u32)
+            }
+            Err(_) => Err(InodeError::BitmapError(BitMapError::RestrictedEntry)),
+        }
+    }
     pub fn free_inode(&mut self, ino_id: u32) -> Result<(), InodeError> {
         let idx = ino_id as usize;
 
@@ -92,7 +104,9 @@ impl FSState {
             BitMapError::RestrictedEntry => InodeError::InvalidInoId,
             BitMapError::AlreadyFree => InodeError::BitmapError(BitMapError::AlreadyFree),
             BitMapError::AlreadyAlloced => InodeError::BitmapError(BitMapError::AlreadyAlloced),
-            BitMapError::NoFreeEntriesOnAlloc => InodeError::BitmapError(BitMapError::NoFreeEntriesOnAlloc),
+            BitMapError::NoFreeEntriesOnAlloc => {
+                InodeError::BitmapError(BitMapError::NoFreeEntriesOnAlloc)
+            }
         })?;
 
         self.metadata
@@ -112,8 +126,8 @@ impl FSState {
         self.blk_bitmap.set_alloc(idx)?;
 
         self.metadata
-        .dec_free_blk_count()
-        .map_err(|_| BitMapError::RestrictedEntry)?;
+            .dec_free_blk_count()
+            .map_err(|_| BitMapError::RestrictedEntry)?;
 
         self.blks[idx] = Some(Block {
             data: [0u8; BLK_SIZE_BYTES as usize],
@@ -128,15 +142,32 @@ impl FSState {
         self.blk_bitmap.set_free(idx)?;
 
         self.metadata
-        .inc_free_blk_count()
-        .map_err(|_| BitMapError::RestrictedEntry)?;
+            .inc_free_blk_count()
+            .map_err(|_| BitMapError::RestrictedEntry)?;
 
         self.blks[idx] = None;
         Ok(())
     }
 
-    // pub fn create_file(& mut self, kind: FileType, perm: u16) -> Result<&Inode, FSStateError> {
-    //     self.alloc_inode(kind, perm)
+    pub fn get_ino_ref(&self, ino_id: u32) -> Result<&Inode, FSStateError> {
+        return Ok(self.inodes[ino_id as usize]
+            .as_ref()
+            .ok_or(FSStateError::InodeError(InodeError::InodeNotFound))?);
+    }
 
+    pub fn get_root_ino_ref(&self) -> Result<&Inode, FSStateError> {
+        return self.get_ino_ref(ROOT_INO);
+    }
+
+    // pub fn create_file(& mut self, kind: FileType, perm: u16) -> Result<&Inode, FSStateError> {
+    //     let ino_ref = self.alloc_inode(kind, perm)
+    //         .map_err(FSStateError::InodeError)
+    //         .and_then(|ino_id| {
+    //             self.inodes[ino_id as usize]
+    //                 .as_ref()
+    //                 .ok_or(FSStateError::InodeError(InodeError::InodeNotFound))
+    //         })?;
+
+    //     Ok(ino_ref)
     // }
 }

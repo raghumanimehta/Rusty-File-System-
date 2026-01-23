@@ -93,7 +93,7 @@ impl FSMetadata {
             Err(FSMetadataError::BlkCountBelowReserved)
         }
     }
-    
+
     pub fn inc_free_blk_count(&mut self) -> Result<(), FSMetadataError> {
         if self.free_blk_count < (NUM_DATA_BLKS - RESERVED_DATA_BLKS) {
             self.free_blk_count += 1;

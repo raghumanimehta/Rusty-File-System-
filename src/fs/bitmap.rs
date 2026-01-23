@@ -1,7 +1,8 @@
+use crate::fs::metadata::{
+    BLK_SIZE_BYTES, MAX_NUM_INODES, NUM_DATA_BLKS, RESERVED_DATA_BLKS, RESERVED_INODES,
+};
 use bitvec::prelude::*;
 use log::error;
-use crate::fs::metadata::{BLK_SIZE_BYTES, NUM_DATA_BLKS, RESERVED_DATA_BLKS, MAX_NUM_INODES, RESERVED_INODES};
-
 
 pub const FREE_BLK_BMAP_SIZE_BYTES: usize = (NUM_DATA_BLKS as usize) / (BLK_SIZE_BYTES as usize);
 pub const FREE_INODE_BMAP_SIZE_BYTES: usize = (MAX_NUM_INODES as usize + 7) / 8;
@@ -11,7 +12,7 @@ pub enum BitMapError {
     RestrictedEntry,
     AlreadyAlloced,
     AlreadyFree,
-    NoFreeEntriesOnAlloc
+    NoFreeEntriesOnAlloc,
 }
 
 pub trait FreeObjectBitmap<const N: usize> {
@@ -56,11 +57,17 @@ pub trait FreeObjectBitmap<const N: usize> {
             Ok(())
         }
     }
+
+    fn is_alloced(&mut self, idx: usize) -> Result<bool, BitMapError> {
+        match self.map().get(idx) {
+            Some(rval) => Ok(*rval),
+            None => Err(BitMapError::RestrictedEntry),
+        }
+    }
 }
 
-
 pub struct FreeBlockBitmap {
-    pub map: BitArray<[u8; FREE_BLK_BMAP_SIZE_BYTES], Lsb0>,  
+    pub map: BitArray<[u8; FREE_BLK_BMAP_SIZE_BYTES], Lsb0>,
 }
 
 impl Default for FreeBlockBitmap {
