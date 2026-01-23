@@ -30,6 +30,10 @@ impl Default for FSState {
         let blk_bitmap = FreeBlockBitmap::default();
         let blks = vec![None; NUM_DATA_BLKS as usize].into_boxed_slice();
 
+        // The bitmap has marked reserved inodes but we have not yet created the root
+        // Null inode does not need an inode object allocated to it
+        //
+
         Self {
             metadata,
             inode_bitmap,
@@ -88,7 +92,7 @@ impl FSState {
         match is_alloced {
             Ok(res) => {
                 if res {
-                    error!("Tried to acces restricted index: {idx}");
+                    error!("Tried to acces restricted index: {idx}, while reading and allocating an inode");
                     return Err(InodeError::BitmapError(BitMapError::AlreadyAlloced));
                 }
                 self.inodes[idx] = Some(read_ino);
@@ -158,16 +162,4 @@ impl FSState {
     pub fn get_root_ino_ref(&self) -> Result<&Inode, FSStateError> {
         return self.get_ino_ref(ROOT_INO);
     }
-
-    // pub fn create_file(& mut self, kind: FileType, perm: u16) -> Result<&Inode, FSStateError> {
-    //     let ino_ref = self.alloc_inode(kind, perm)
-    //         .map_err(FSStateError::InodeError)
-    //         .and_then(|ino_id| {
-    //             self.inodes[ino_id as usize]
-    //                 .as_ref()
-    //                 .ok_or(FSStateError::InodeError(InodeError::InodeNotFound))
-    //         })?;
-
-    //     Ok(ino_ref)
-    // }
 }
