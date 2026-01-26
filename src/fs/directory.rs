@@ -1,12 +1,19 @@
+use crate::fs::metadata::BLK_SIZE_BYTES;
 use log::error;
+use std::mem::size_of;
 
 pub const MAX_FILENAME_LEN: usize = 255;
+pub const DIR_SIZE_LEN: usize = (BLK_SIZE_BYTES / size_of::<DirEntry>() as u64) as usize;
 
 #[derive(Clone, Copy)]
 pub struct DirEntry {
     pub ino_id: u32,
     pub name_len: u8,
     pub name: [u8; MAX_FILENAME_LEN],
+}
+
+pub struct Directory {
+    dir_entries: Box<[Option<DirEntry>]>,
 }
 
 #[derive(Debug)]
@@ -52,5 +59,33 @@ impl DirEntry {
             error!("Invalid UTF-8 in directory entry name");
             DirectoryError::InvalidUtf8
         })
+    }
+}
+
+impl Default for Directory {
+    fn default() -> Self {
+        Self {
+            dir_entries: vec![None; DIR_SIZE_LEN].into_boxed_slice(),
+        }
+    }
+}
+impl Directory {
+    /// Creates a new directory with default empty entries
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Sets the directory entries, ensuring they don't exceed the maximum capacity
+    pub fn set_entries(&mut self, entries: Box<[Option<DirEntry>]>) -> Result<(), DirectoryError> {
+        if entries.len() > DIR_SIZE_LEN {
+            error!(
+                "Attempted to set entries exceeding max capacity: {} > {}",
+                entries.len(),
+                DIR_SIZE_LEN
+            );
+            return Err(DirectoryError::NameTooLong); // Reusing error for now
+        }
+        self.dir_entries = entries;
+        Ok(())
     }
 }
