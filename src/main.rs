@@ -13,8 +13,9 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use crate::fs::bitmap::{BitMapError, FreeBlockBitmap, FreeInodeBitmap, FreeObjectBitmap};
+    use crate::fs::inode::InodeError;
     use crate::fs::metadata::{MAX_NUM_INODES, NUM_DATA_BLKS, RESERVED_DATA_BLKS, RESERVED_INODES};
-    use crate::fs::state::{FSState, InodeError};
+    use crate::fs::state::FSState;
     use fuser::FileType;
 
     // Test find_first_free
