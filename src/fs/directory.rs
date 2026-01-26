@@ -71,11 +71,13 @@ impl Default for Directory {
 }
 impl Directory {
     /// Creates a new directory with default empty entries
-    pub fn new() -> Self {
-        let mut dir = Self::default();
-        let empty_entries = vec![None; DIR_SIZE_LEN].into_boxed_slice();
-        dir.set_entries(empty_entries).unwrap();
-        dir
+    /// Caller must ensure that
+    pub fn new_with_entries(
+        mut self,
+        entries: Box<[Option<DirEntry>]>,
+    ) -> Result<Self, DirectoryError> {
+        self.set_entries(entries)?;
+        Ok(self)
     }
 
     /// Sets the directory entries, ensuring they don't exceed the maximum capacity
