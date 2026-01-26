@@ -1,5 +1,5 @@
 use crate::fs::bitmap::{BitMapError, FreeBlockBitmap, FreeInodeBitmap, FreeObjectBitmap};
-use crate::fs::inode::{Inode, InodeError, ROOT_INO};
+use crate::fs::inode::{create_root_ino, Inode, InodeError, ROOT_INO};
 use crate::fs::metadata::{FSMetadata, MAX_NUM_INODES};
 use fuser::FileType;
 use log::error;
@@ -26,13 +26,17 @@ impl Default for FSState {
     fn default() -> Self {
         let metadata = FSMetadata::default();
         let inode_bitmap = FreeInodeBitmap::default();
-        let inodes = vec![None; MAX_NUM_INODES as usize].into_boxed_slice();
+        let mut inodes = vec![None; MAX_NUM_INODES as usize].into_boxed_slice();
         let blk_bitmap = FreeBlockBitmap::default();
-        let blks = vec![None; NUM_DATA_BLKS as usize].into_boxed_slice();
+        let mut blks = vec![None; NUM_DATA_BLKS as usize].into_boxed_slice();
 
         // The bitmap has marked reserved inodes but we have not yet created the root
         // Null inode does not need an inode object allocated to it
-        //
+
+        inodes[ROOT_INO as usize] = Some(create_root_ino());
+        blks[ROOT_INO as usize] = Some(Block {
+            data: [0u8; BLK_SIZE_BYTES as usize],
+        });
 
         Self {
             metadata,
