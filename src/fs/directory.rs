@@ -72,7 +72,10 @@ impl Default for Directory {
 impl Directory {
     /// Creates a new directory with default empty entries
     pub fn new() -> Self {
-        Self::default()
+        let mut dir = Self::default();
+        let empty_entries = vec![None; DIR_SIZE_LEN].into_boxed_slice();
+        dir.set_entries(empty_entries).unwrap();
+        dir
     }
 
     /// Sets the directory entries, ensuring they don't exceed the maximum capacity
