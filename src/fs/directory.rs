@@ -21,6 +21,7 @@ pub enum DirectoryError {
     NameTooLong,
     NameEmpty,
     InvalidUtf8,
+    NoEmptySlot,
 }
 
 impl DirEntry {
@@ -69,17 +70,17 @@ impl Default for Directory {
         }
     }
 }
-impl Directory {
-    /// Creates a new directory with default empty entries
-    /// Caller must ensure that
-    pub fn new_with_entries(
-        mut self,
-        entries: Box<[Option<DirEntry>]>,
-    ) -> Result<Self, DirectoryError> {
-        self.set_entries(entries)?;
-        Ok(self)
-    }
 
+pub fn new_dir_with_entries(entries: Box<[Option<DirEntry>]>) -> Result<Directory, DirectoryError> {
+    let mut dir = Directory::default();
+    let res = dir.set_entries(entries);
+    match res {
+        Ok(_) => Ok(dir),
+        Err(e) => return Err(e),
+    }
+}
+
+impl Directory {
     /// Sets the directory entries, ensuring they don't exceed the maximum capacity
     pub fn set_entries(&mut self, entries: Box<[Option<DirEntry>]>) -> Result<(), DirectoryError> {
         if entries.len() > DIR_SIZE_LEN {
@@ -93,4 +94,14 @@ impl Directory {
         self.dir_entries = entries;
         Ok(())
     }
+    /*
+        fn find_empty_slot(&self) -> Option<usize> {
+            for i in 0..self.dir_entries.len() {
+                if self.dir_entries[i].is_none() {
+                    return i;
+                }
+            }
+        }
+    */
+    pub fn add_entry(&mut self, enttry: DirEntry) {}
 }
