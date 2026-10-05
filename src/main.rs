@@ -126,6 +126,24 @@ mod tests {
     }
 
     #[test]
+    fn test_free_block_bitmap_covers_full_capacity() {
+        let mut bitmap = FreeBlockBitmap::default();
+        for idx in [512, NUM_DATA_BLKS as usize - 1] {
+            bitmap.set_alloc(idx).unwrap();
+            assert!(bitmap.is_alloced(idx).unwrap());
+            bitmap.set_free(idx).unwrap();
+            assert!(!bitmap.is_alloced(idx).unwrap());
+        }
+
+        bitmap.map.fill(true);
+        let last = NUM_DATA_BLKS as usize - 1;
+        bitmap.set_free(last).unwrap();
+        assert_eq!(bitmap.find_first_free(), Some(last));
+        bitmap.set_alloc(last).unwrap();
+        assert_eq!(bitmap.find_first_free(), None);
+    }
+
+    #[test]
     fn test_free_block_bitmap_max() {
         let mut bitmap = FreeBlockBitmap::default();
         let idx = NUM_DATA_BLKS as usize;

@@ -1,10 +1,10 @@
 use crate::fs::metadata::{
-    BLK_SIZE_BYTES, MAX_NUM_INODES, NUM_DATA_BLKS, RESERVED_DATA_BLKS, RESERVED_INODES,
+    MAX_NUM_INODES, NUM_DATA_BLKS, RESERVED_DATA_BLKS, RESERVED_INODES,
 };
 use bitvec::prelude::*;
 use log::error;
 
-pub const FREE_BLK_BMAP_SIZE_BYTES: usize = (NUM_DATA_BLKS as usize) / (BLK_SIZE_BYTES as usize);
+pub const FREE_BLK_BMAP_SIZE_BYTES: usize = (NUM_DATA_BLKS as usize + 7) / 8;
 pub const FREE_INODE_BMAP_SIZE_BYTES: usize = (MAX_NUM_INODES as usize + 7) / 8;
 
 #[derive(Debug)]

@@ -56,7 +56,7 @@ pub enum FSMetadataError {
 
 impl FSMetadata {
     pub fn dec_free_ino_count(&mut self) -> Result<(), FSMetadataError> {
-        if self.free_ino_count < 0 {
+        if self.free_ino_count == 0 {
             error!(
                 "Attempted to decrease the inode count below reserved: {}",
                 { RESERVED_INODES }

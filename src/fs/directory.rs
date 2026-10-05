@@ -94,14 +94,37 @@ impl Directory {
         self.dir_entries = entries;
         Ok(())
     }
-    /*
-        fn find_empty_slot(&self) -> Option<usize> {
-            for i in 0..self.dir_entries.len() {
-                if self.dir_entries[i].is_none() {
-                    return i;
+
+    fn find_empty_slot(&self) -> Option<usize> {
+        // Finds an empty slot and returns the index of the slot
+        //
+        for i in 0..self.dir_entries.len() {
+            if self.dir_entries[i].is_none() {
+                return Some(i);
+            }
+        }
+        return None;
+    }
+
+    pub fn add_entry(&mut self, entry: DirEntry) -> Result<(), DirectoryError> {
+        // adds an entry to the directory 
+        // TODO: add the option to increase the size of the directory later
+        let slot_idx = self.find_empty_slot();
+        if slot_idx.is_none() {
+            return Err(DirectoryError::NoEmptySlot);
+        }
+        self.dir_entries[slot_idx.unwrap()] = Some(entry);
+        Ok(())
+    }
+
+    pub fn contains_name(&self, name: &str) -> Result<bool, DirectoryError> {
+        for entry_opt in self.dir_entries.iter() {
+            if let Some(entry) = entry_opt {
+                if entry.name_str()? == name {
+                    return Ok(true);
                 }
             }
         }
-    */
-    pub fn add_entry(&mut self, enttry: DirEntry) {}
+        Ok(false)
+    }
 }
