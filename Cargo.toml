@@ -12,6 +12,10 @@ bitvec = "1.0.1"
 [dev-dependencies]
 tempdir = "0.3.7"
 
+[workspace]
+members = ["network_handler"]
+resolver = "3"
+
 [[bin]]
 name = "rusty-file-system"
 path = "src/main.rs"
